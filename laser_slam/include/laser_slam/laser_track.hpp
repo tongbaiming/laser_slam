@@ -205,6 +205,7 @@ class LaserTrack {
   std::vector<LaserScan> laser_scans_;
 
   // Underlying trajectory.
+  //tbm:每个laserTrack都有一个CurveType的轨迹
   CurveType trajectory_;
 
   // TODO replace by standard mutex?

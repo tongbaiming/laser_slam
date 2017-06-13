@@ -21,6 +21,7 @@ LaserTrack::LaserTrack(const LaserTrackParams& parameters,
   }
 
   // Load the ICP input filters configurations.
+  std::cout << "params_.icp_input_filters_file: " << params_.icp_input_filters_file << std::endl;
   std::ifstream ifs_input_filters(params_.icp_input_filters_file.c_str());
   if (ifs_input_filters.good()) {
     LOG(INFO) << "Loading ICP input filters from: " << params_.icp_input_filters_file;
@@ -346,6 +347,7 @@ void LaserTrack::appendPriorFactors(const Time& prior_time_ns, NonlinearFactorGr
   trajectory_.addPriorFactors(graph, prior_time_ns);
 }
 
+//tbm:LaserTrack这个类能够根据自身的里程计信息,和扫描的激光点云的匹配构造gtsam中因子图的factor
 void LaserTrack::appendOdometryFactors(const curves::Time& optimization_min_time_ns,
                                        const curves::Time& optimization_max_time_ns,
                                        noiseModel::Base::shared_ptr noise_model,
@@ -411,6 +413,7 @@ void LaserTrack::appendLoopClosureFactors(const curves::Time& optimization_min_t
   }
 }
 
+//tbm:gtsam所需要的全部数据都来源与这个LaserTrack类
 void LaserTrack::initializeGTSAMValues(const KeySet& keys, Values* values) const {
   std::lock_guard<std::recursive_mutex> lock(full_laser_track_mutex_);
   trajectory_.initializeGTSAMValues(keys, values);
@@ -421,6 +424,7 @@ void LaserTrack::updateFromGTSAMValues(const Values& values) {
   trajectory_.updateFromGTSAMValues(values);
 }
 
+//tbm:并且,LaserTrack根据gtsam平滑后的结果更新自身保存的轨迹，也就是trajectory ,同时也更新
 void LaserTrack::updateCovariancesFromGTSAMValues(const gtsam::NonlinearFactorGraph& factor_graph,
                                                   const gtsam::Values& values) {
   std::lock_guard<std::recursive_mutex> lock(full_laser_track_mutex_);
@@ -431,6 +435,7 @@ void LaserTrack::updateCovariancesFromGTSAMValues(const gtsam::NonlinearFactorGr
   }
 }
 
+//tbm:根据相对位移构造因子，这里作为相对位移的类型是LaserTrack类中自己定义的一个类型RelativePose
 ExpressionFactor<SE3>
 LaserTrack::makeRelativeMeasurementFactor(const RelativePose& relative_pose_measurement,
                                           noiseModel::Base::shared_ptr noise_model,
@@ -470,7 +475,9 @@ void LaserTrack::computeICPTransformations() {
 }
 
 void LaserTrack::localScanToSubMap() {
+  //tbm:LaserScan这个结构体类型也是在laser_slam命名空间中定义的，在文件common.hpp中，表示一个点云。
   LaserScan last_scan = laser_scans_.back();
+  //tbm:RelativePose这个类型是在laser_slam命名空间中定义的，在文件common.hpp中
   RelativePose icp_transformation;
   icp_transformation.time_b_ns = last_scan.time_ns;
   icp_transformation.time_a_ns = laser_scans_[getNumScans() - 2u].time_ns;
@@ -482,6 +489,8 @@ void LaserTrack::localScanToSubMap() {
       laser_scans_[getNumScans() - 2u].time_ns);
   DataPoints sub_map = laser_scans_[getNumScans() - 2u].scan;
   PointMatcher::TransformationParameters transformation_matrix;
+  //tbm:计算若干(由参数params_.nscan_in_sub_map决定)之前的LaserScan与倒数第二个LaserScan之间的转移矩阵,
+  //tbm:并将他们连接到倒数第二个LaserScan上以构成submap
   for (size_t i = 0u; i < std::min(getNumScans() - 2u, size_t(params_.nscan_in_sub_map - 1u)); ++i) {
     LaserScan previous_scan = laser_scans_[getNumScans() - 3u - i];
     transformation_matrix = (T_w_to_second_last_scan.inverse() *
@@ -493,13 +502,16 @@ void LaserTrack::localScanToSubMap() {
   }
   clock.takeTime();
   LOG(INFO) << "Took " << clock.getRealTime() << " ms to build the submap.";
-
+  //tbm:这个initial_guess就是最新的LaserScan与倒数第二个LaserScan之间的转移矩阵
+  //tbm:需要注意的是,这里全部用的是trajectory_.evalue(icp_transformation.time_b_ns)来得到最新LaserScan的位姿。
+  //tbm:这个icp_transformation.time_b_ns在上面定义为last_scan.time_ns
   // Obtain the initial guess from the trajectory.
   SE3 initial_guess = trajectory_.evaluate(icp_transformation.time_a_ns).inverse() *
       trajectory_.evaluate(icp_transformation.time_b_ns);
   transformation_matrix = initial_guess.getTransformationMatrix().cast<float>();
 
   PointMatcher::TransformationParameters icp_solution = transformation_matrix;
+  //tbm:利用ethz的libpointmatcher包中包装后的icp算法计算，初始值是由initial_guess转化而来的transformation_matrix
   // Compute the ICP solution.
   try {
     icp_solution = icp_.compute(last_scan.scan, sub_map, transformation_matrix);
@@ -509,7 +521,7 @@ void LaserTrack::localScanToSubMap() {
   {
     //LOG(INFO) << "ICP failed to converge: " << error.what();
   }
-
+  //tbm:rigid_transformation的类型是PointMatcher::Transformation*,
   if (params_.save_icp_results) {
     last_scan.scan.save("/tmp/last_scan.vtk");
     sub_map.save("/tmp/sub_map.vtk");

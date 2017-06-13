@@ -112,6 +112,7 @@ struct RelativePose {
 /// \brief LaserScan type including point cloud and time stamp.
 struct LaserScan {
   /// \brief Local point cloud scan.
+  //tbm: 这里DataPoints是定义在libpointmatcher中的一个结构体，用来表示一个点云.
   DataPoints scan;
   /// \brief Time stamp.
   curves::Time time_ns;

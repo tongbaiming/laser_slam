@@ -42,7 +42,8 @@ void LaserSlamWorker::init(
   params_ = params;
   incremental_estimator_ = incremental_estimator;
   worker_id_ = worker_id;
-
+  //tbm:LaserSlamWorker类中的成员变量laser_track_是从成员变量incremental_estimator中捡出来的
+  //tbm:还要具体看一下incremental_estimator的构造函数
   // Get the LaserTrack object from the IncrementalEstimator.
   laser_track_ = incremental_estimator_->getLaserTrack(worker_id);
 
@@ -301,9 +302,15 @@ void LaserSlamWorker::publishTrajectory(const Trajectory& trajectory,
     pose_msg.header.stamp.fromNSec(curveTimeToRosTime(timePose.first));
 
     //TODO functionize
-    pose_msg.pose.position.x = timePose.second.getPosition().x();
-    pose_msg.pose.position.y = timePose.second.getPosition().y();
-    pose_msg.pose.position.z = timePose.second.getPosition().z();
+    //tbm:change ...getPosition().x() has fault in eclipse and getPosition() return type QuatTransformationTemplate<Scalar>::Position
+    //but the in package minkindr file quat-transformation.h, typedef PositionTemplate<Scalar> Position, and in file position.h: using PositionTemplate = Eigen::Matrix<Scalar, 3, 1>;
+    //so type Position has no member function x(), y(), z(), so tbm change it to (0,0), (1, 0 ), (2, 0)
+    //pose_msg.pose.position.x = timePose.second.getPosition().x();
+    //pose_msg.pose.position.y = timePose.second.getPosition().y();
+    //pose_msg.pose.position.z = timePose.second.getPosition().z();
+    pose_msg.pose.position.x = (timePose.second.getPosition())(0, 0);
+    pose_msg.pose.position.y = (timePose.second.getPosition())(1, 0);
+    pose_msg.pose.position.z = (timePose.second.getPosition())(2, 0);
     pose_msg.pose.orientation.w = timePose.second.getRotation().w();
     pose_msg.pose.orientation.x = timePose.second.getRotation().x();
     pose_msg.pose.orientation.y = timePose.second.getRotation().y();

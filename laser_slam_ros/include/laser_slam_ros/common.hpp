@@ -7,6 +7,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <ros/ros.h>
+#include <iostream>
 
 namespace laser_slam_ros {
 
@@ -57,8 +58,9 @@ struct LaserSlamWorkerParams {
 static LaserSlamWorkerParams getLaserSlamWorkerParams(const ros::NodeHandle& nh,
                                                       const std::string& prefix) {
   LaserSlamWorkerParams params;
-  const std::string ns = prefix + "/LaserSlamWorker";
-
+  //tbm: this is original const std::string ns = prefix + "/LaserSlamWorker";
+  //tbm: change
+  const std::string ns = prefix + "LaserSlamWorker";
   nh.getParam(ns + "/distance_to_consider_fixed", params.distance_to_consider_fixed);
   nh.getParam(ns + "/separate_distant_map", params.separate_distant_map);
   nh.getParam(ns + "/create_filtered_map", params.create_filtered_map);
@@ -95,11 +97,23 @@ static LaserSlamWorkerParams getLaserSlamWorkerParams(const ros::NodeHandle& nh,
 static laser_slam::LaserTrackParams getLaserTrackParams(const ros::NodeHandle& nh,
                                                         const std::string& prefix) {
   laser_slam::LaserTrackParams params;
+  //tbm: this is original const std::string ns = prefix + "/LaserTrack";
+  //tbm:change
   const std::string ns = prefix + "/LaserTrack";
-
+  std::cout << "ns: " << ns << std::endl;
+  std::cout << "nh namespace: " << nh.getNamespace() << std::endl;
+  std::cout << "ns + /odometry_noise_model: " << ns + "/odometry_noise_model" << std::endl;
   std::vector<float> odometry_noise_model, icp_noise_model;
   constexpr unsigned int kNoiseModelDimension = 6u;
   nh.getParam(ns + "/odometry_noise_model", odometry_noise_model);
+
+  std::cout << "I get odometry_noise_model: [ ";
+  for(auto i = odometry_noise_model.begin(); i != odometry_noise_model.end(); i++)
+  {
+    std::cout << (*i) << ", ";
+  } 
+  std::cout << " ]" << std::endl;
+
   CHECK_EQ(odometry_noise_model.size(), kNoiseModelDimension);
   for (size_t i = 0u; i < 6u; ++i) {
     params.odometry_noise_model[i] = odometry_noise_model.at(i);
@@ -119,17 +133,40 @@ static laser_slam::LaserTrackParams getLaserTrackParams(const ros::NodeHandle& n
   nh.getParam(ns + "/save_icp_results", params.save_icp_results);
 
   nh.getParam(ns + "/force_priors", params.force_priors);
+  nh.getParam(ns + "/icp_input_filters_file", params.icp_input_filters_file);
+  std::cout << "icp_input_filters_file: " << params.icp_input_filters_file << std::endl;
   return params;
 }
 
 static laser_slam::EstimatorParams getOnlineEstimatorParams(const ros::NodeHandle& nh,
                                                             const std::string& prefix) {
   laser_slam::EstimatorParams params;
-  const std::string ns = prefix + "/OnlineEstimator";
-
+  //tbm: this is original const std::string ns = prefix + "/OnlineEstimator";
+  //tbm: below is tbm changed
+  const std::string ns = prefix + "OnlineEstimator";
+  std::cout << "ns: " << ns << std::endl;
+  std::cout << "nh namespace: " << nh.getNamespace() << std::endl;
+  std::cout << "ns + /loop_closure_noise_model: " << ns + "/loop_closure_noise_model" << std::endl;
   std::vector<float>  loop_closure_noise_model;
+  std::vector<float>  loop_closure_noise_model_2;
   constexpr unsigned int kNoiseModelDimension = 6u;
   nh.getParam(ns + "/loop_closure_noise_model", loop_closure_noise_model);
+  nh.getParam("/party_1/instance_1/OnlineEstimator/loop_closure_noise_model", loop_closure_noise_model_2);
+  std::cout << "I get loop_closure_noise_model: [ ";
+  for(auto i = loop_closure_noise_model.begin(); i != loop_closure_noise_model.end(); i++)
+  {
+    std::cout << (*i) << ", ";
+  } 
+  std::cout << " ]" << std::endl;
+  std::cout << "loop_closure_noise_model size: " << loop_closure_noise_model.size() << std::endl;
+  std::cout << "I get loop_closure_noise_model_2: [ ";
+  for(auto i = loop_closure_noise_model_2.begin(); i != loop_closure_noise_model_2.end(); i++)
+  {
+    std::cout << (*i) << ", ";
+  } 
+  std::cout << " ]" << std::endl;
+  std::cout << "loop_closure_noise_model_2 size: " << loop_closure_noise_model_2.size() << std::endl;
+
   CHECK_EQ(loop_closure_noise_model.size(), kNoiseModelDimension);
   for (size_t i = 0u; i < 6u; ++i) {
     params.loop_closure_noise_model[i] = loop_closure_noise_model.at(i);

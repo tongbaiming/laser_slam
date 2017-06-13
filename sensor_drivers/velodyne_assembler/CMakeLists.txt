@@ -4,6 +4,8 @@ project(velodyne_assembler)
 find_package(catkin_simple REQUIRED)
 find_package(cmake_modules REQUIRED)
 find_package(Eigen REQUIRED)
+find_package(eigen_catkin REQUIRED)
+#find_package(pointmatcher_ros REQUIRED)
 
 catkin_simple()
 
