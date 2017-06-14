@@ -163,6 +163,7 @@ class LaserSlamWorker {
   tf::StampedTransform world_to_odom_;
 
   static constexpr double kTimeout_s = 0.2;
+  //static constexpr double kTimeout_s = 5;
   static constexpr unsigned int kScanSubscriberMessageQueueSize = 1u;
   static constexpr unsigned int kPublisherQueueSize = 50u;
 }; // LaserSlamWorker

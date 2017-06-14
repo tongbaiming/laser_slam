@@ -19,6 +19,5 @@
   <build_depend>libpointmatcher</build_depend>
   <build_depend>libpointmatcher_ros</build_depend>
   <build_depend>eigen_catkin</build_depend>
-  <build_depend>pointmatcher_ros</build_depend>
 
 </package>

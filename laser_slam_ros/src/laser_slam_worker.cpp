@@ -50,6 +50,8 @@ void LaserSlamWorker::init(
   // Setup subscriber.
   scan_sub_ = nh.subscribe(params_.assembled_cloud_sub_topic, kScanSubscriberMessageQueueSize,
                            &LaserSlamWorker::scanCallback, this);
+  ROS_INFO("I am in LaserSlamWorker::init(), nh.namespace: %s", nh.getNamespace().c_str());
+  ROS_INFO("I am in LaserSlamWorker::init(), params_.assembled_cloud_sub_topic: %s", (params_.assembled_cloud_sub_topic).c_str());
 
   // Setup publishers.
   trajectory_pub_ = nh.advertise<nav_msgs::Path>(params_.trajectory_pub_topic,
@@ -103,6 +105,11 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
       tf::StampedTransform tf_transform;
       tf_listener_.lookupTransform(params_.odom_frame, params_.sensor_frame,
                                    cloud_msg_in.header.stamp, tf_transform);
+      ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker, tf transform ok\n");
+      ROS_INFO("tf_transform.frame_id_ = %s, tf_transform.child_frame_id_ = %s", (tf_transform.frame_id_).c_str(), (tf_transform.child_frame_id_).c_str());
+      //std::cout << "tf_transform.getBasis = " << tf_transform.getBasis() << std::endl;
+      std::cout << "tf_transform.getOrigin = " << tf_transform.getOrigin() << std::endl;
+      std::cout << "tf_transform.getRotation = " << tf_transform.getRotation() << std::endl;
 
       bool process_scan = false;
       SE3 current_pose;
@@ -114,25 +121,37 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
       } else {
         current_pose = tfTransformToPose(tf_transform).T_w;
         float dist_m = distanceBetweenTwoSE3(current_pose, last_pose_);
+        ROS_INFO("I am in laser_slam_worker, dist_m = %f", dist_m);
         if (dist_m > params_.minimum_distance_to_add_pose) {
           process_scan = true;
           last_pose_ = current_pose;
         }
       }
-
+      ROS_INFO_THROTTLE(1.5,  "I am in laser_slam_worker,  before process_scan\n");
       if (process_scan) {
+        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan\n");
         // Convert input cloud to laser scan.
         LaserScan new_scan;
+        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 0.1\n");
+        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, cloud_msg_in.row_step: %d \n", cloud_msg_in.row_step);
+        //std::cout << cloud_msg_in.fields << std::endl;
         new_scan.scan = PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloud_msg_in);
+
+        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 0.2\n");
         new_scan.time_ns = rosTimeToCurveTime(cloud_msg_in.header.stamp.toNSec());
+        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 0.3\n");
 
         // Process the new scan and get new values and factors.
         gtsam::NonlinearFactorGraph new_factors;
         gtsam::Values new_values;
         bool is_prior;
+        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1\n");
+        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1, params_.use_odometry_information: %d\n", params_.use_odometry_information);
         if (params_.use_odometry_information) {
+          ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1.1, params_.use_odometry_information\n");
           laser_track_->processPoseAndLaserScan(tfTransformToPose(tf_transform), new_scan,
                                                 &new_factors, &new_values, &is_prior);
+          ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1.2, params_.use_odometry_information\n");
         } else {
           Pose new_pose;
 
