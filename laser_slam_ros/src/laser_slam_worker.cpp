@@ -113,7 +113,8 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
 
       bool process_scan = false;
       SE3 current_pose;
-
+      /*只有第一次进入回调函数scanCallback时，也就是第一次得到传感器数据时，last_pose_set_由false被设置成了true，之后就再也不会被设置成false了
+      因此后续回调函数都进入下面if else结构中的else，*/
       if (!last_pose_set_) {
         process_scan = true;
         last_pose_set_ = true;
@@ -131,6 +132,8 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
       if (process_scan) {
         ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan\n");
         // Convert input cloud to laser scan.
+        /*LaserScan类型是定义在命名空间laser_slam中的结构体，其中有三个成员DataPoints scan，curves::Time time_ns，Key key
+        其中DataPoints类型是定义在laser_slam命名空间中的typedef typename PointMatcher::DataPoints DataPoints*/
         LaserScan new_scan;
         ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 0.1\n");
         ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, cloud_msg_in.row_step: %d \n", cloud_msg_in.row_step);
@@ -193,6 +196,12 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
         laser_track_->updateFromGTSAMValues(result);
 
         // Adjust the correction between the world and odom frames.
+        /*tbm将里程计坐标系设置成/world，世界坐标系也是/world，从laser_track_中得到的current_pose是基于世界坐标系的，
+        因为pose类型中的SE3 T_w，注释中说：Absolute transform。而且其中字母w的含义可能就是指明是基于world坐标系的
+        下面的T_odom_sensor是根据tf_transform得到的传感器坐标系与里程计坐标系之间的转换，
+        tbm将传感器坐标系设置为base_link_inertia，里程计坐标系设置为/world
+        下面的语句：SE3 T_w_sensor = current_pose.T_w, 指明laser_track_中的位置其实就是sensor frame的在世界坐标系中的位置
+        下面的T_w_odom指的就是里程计坐标系在世界坐标系中的位置*/
         Pose current_pose = laser_track_->getCurrentPose();
         SE3 T_odom_sensor = tfTransformToPose(tf_transform).T_w;
         SE3 T_w_sensor = current_pose.T_w;
@@ -310,6 +319,9 @@ bool LaserSlamWorker::getLaserTracksServiceCall(
 
 void LaserSlamWorker::publishTrajectory(const Trajectory& trajectory,
                                         const ros::Publisher& publisher) const {
+  /*LaserSlamWorker命名空间中定义的Trajectory类型是std::map<Time, SE3>,其中Time类型是curves::Time，是在mincurves包中的
+  本函数是将Trajectory类型的轨迹转换为nav_msgs::Path类型的轨迹traj_msg
+  需要注意的是，traj_msg.header.frame_id被设置为params_.world_frame这说明laser_track_中轨迹的pose确实都是相对于世界坐标系/world的*/
   nav_msgs::Path traj_msg;
   traj_msg.header.frame_id = params_.world_frame;
   Time traj_time = curveTimeToRosTime(trajectory.rbegin()->first);
@@ -355,6 +367,9 @@ void LaserSlamWorker::publishMap() {
       sensor_msgs::PointCloud2 msg;
       {
         std::lock_guard<std::recursive_mutex> lock(local_map_filtered_mutex_);
+        /*local_map_filtered的类型为pcl库中的类型并重命名为PointCloud，将其转换为sensor_msgs::PointCloud2
+        将frame设置为params_.world_frame在当前配置文件中我设定的是/world，
+        如果这样合理那么说明local_map_filtered_本身就是在/world frame中定义的数据*/
         convert_to_point_cloud_2_msg(local_map_filtered_, params_.world_frame, &msg);
       }
       local_map_pub_.publish(msg);
@@ -526,7 +541,8 @@ void LaserSlamWorker::updateLocalMap(const SE3& last_pose_before_update,
 
   Trajectory new_trajectory;
   laser_track_->getTrajectory(&new_trajectory);
-
+  /*new_trajectory可能是指优化后的新轨迹，优化前后轨迹中的最新位姿点(可能是相对于世界坐标系/world而言)有一个转换矩阵，
+  得到这个矩阵，由于local_map_是根据最新位姿点得到的，因此如果最新位姿点的估计变了，那么local_map_的位置也有相同的转换*/
   SE3 new_last_pose = new_trajectory.at(last_pose_before_update_timestamp_ns);
 
   const Eigen::Matrix4f transform_matrix = (new_last_pose * last_pose_before_update.inverse()).

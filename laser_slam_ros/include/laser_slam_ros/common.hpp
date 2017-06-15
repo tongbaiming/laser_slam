@@ -231,6 +231,13 @@ static void convert_to_point_cloud_2_msg(const PointCloud& cloud,
                                          const std::string& frame,
                                          sensor_msgs::PointCloud2* converted) {
   PointICloud cloud_i;
+  /*tbm: 将PointCloud类型转换成PointICloud类型,其中PointCloud类型定义为(在本文件上部)
+  typedef pcl::PointXYZ PclPoint; 
+  typedef pcl::PointCloud<PclPoint> PointCloud;
+  PointICloud的类型定义为：
+  typedef pcl::PointXYZI PointI;
+  typedef pcl::PointCloud<PointI> PointICloud;
+  */
   pcl::copyPointCloud(cloud, cloud_i);
   convert_to_point_cloud_2_msg(cloud_i, frame, converted);
 }

@@ -119,7 +119,9 @@ void LaserTrack::processLaserScan(const LaserScan& in_scan) {
   setPoseKey(scan.time_ns, scan.key);
   laser_scans_.push_back(scan);
 }
-
+/*函数processPoseAndLaserScan中传入的参数pose，是由tf_transform转化而来，调用此函数的是laser_slam_ros中的scanCallbak回调函数，
+其中tf_transform是从sensor frame到odom frame的转换，tbm将sensor frame设置为/base_link_inertia，讲odom frame设置为/world
+因此laser_track中的pose_measurement_中储存的都是这种相对由里程计坐标系的pose*/
 void LaserTrack::processPoseAndLaserScan(const Pose& pose, const LaserScan& in_scan,
                                          gtsam::NonlinearFactorGraph* newFactors,
                                          gtsam::Values* newValues,
