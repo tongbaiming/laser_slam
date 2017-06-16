@@ -264,6 +264,7 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
             local_map_queue_.push_back(new_fixed_cloud_pcl);
           }
         }
+        publishMap();
       }
     } else {
       ROS_WARN_STREAM("[SegMapper] Timeout while waiting between " + params_.odom_frame  +
@@ -357,6 +358,7 @@ void LaserSlamWorker::publishMap() {
         std::lock_guard<std::recursive_mutex> lock(local_map_filtered_mutex_);
         convert_to_point_cloud_2_msg(local_map_filtered_, params_.world_frame, &msg);
       }
+      ROS_INFO( "@@@@@I am going to publish %s", (params_.local_map_pub_topic).c_str());
       local_map_pub_.publish(msg);
     }
     //    if (params_.publish_distant_map) {
