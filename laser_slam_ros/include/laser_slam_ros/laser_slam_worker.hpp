@@ -124,7 +124,10 @@ class LaserSlamWorker {
   //  ros::Publisher odometry_trajectory_pub_;
   //  ros::Publisher point_cloud_pub_;
   //  ros::Publisher distant_map_pub_;
-  //  ros::Publisher new_fixed_cloud_pub_;
+  ros::Publisher new_fixed_cloud_pub_;
+  ros::Publisher last_point_cloud_pub_;
+  ros::Publisher cloud_msg_in_pub_;
+  ros::Publisher new_scan_pub_;
 
   // Services.
   ros::ServiceServer get_laser_track_srv_;
@@ -162,7 +165,7 @@ class LaserSlamWorker {
 
   tf::StampedTransform world_to_odom_;
 
-  static constexpr double kTimeout_s = 0.2;
+  static constexpr double kTimeout_s = 0.02;
   //static constexpr double kTimeout_s = 5;
   static constexpr unsigned int kScanSubscriberMessageQueueSize = 1u;
   static constexpr unsigned int kPublisherQueueSize = 50u;

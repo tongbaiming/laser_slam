@@ -144,11 +144,11 @@ void LaserTrack::processPoseAndLaserScan(const Pose& pose, const LaserScan& in_s
   LaserScan scan = in_scan;
 
   // Apply the input filters.
-  fprintf(stderr, "I am in LaserTrack::processPoseAndLaserScan(), flag 1\n" );
+  //fprintf(stderr, "I am in LaserTrack::processPoseAndLaserScan(), flag 1\n" );
   Clock clock;
   //input_filters_.apply(scan.scan);
   clock.takeTime();
-  fprintf(stderr, "I am in LaserTrack::processPoseAndLaserScan(), flag 2\n" );
+  //fprintf(stderr, "I am in LaserTrack::processPoseAndLaserScan(), flag 2\n" );
   LOG(INFO) << "Took " << clock.getRealTime() << " ms to filter the input scan.";
 
   // Save the pose measurement.
@@ -236,10 +236,23 @@ void LaserTrack::processPoseAndLaserScan(const Pose& pose, const LaserScan& in_s
   }
 }
 
+//tbm change
 void LaserTrack::getLastPointCloud(DataPoints* out_point_cloud) const {
   std::lock_guard<std::recursive_mutex> lock(full_laser_track_mutex_);
   CHECK_NOTNULL(out_point_cloud);
   // todo
+  //tbm do
+  //std::vector<LaserScan>::iterator it = laser_scans_.end();
+  auto it = laser_scans_.end();
+  it--;
+  *out_point_cloud = it->scan;
+  /*
+  std::vector<curves::Time>* out_times_ns
+  getLaserScansTimes(out_times_ns);
+  std::vector<curves::Time>const_iterator it_2 = out_times_ns->end();
+  (*it_2)
+  //curves::Time time_ns
+  */
 }
 
 void LaserTrack::getPointCloudOfTimeInterval(const std::pair<Time, Time>& times_ns,
@@ -250,6 +263,7 @@ void LaserTrack::getPointCloudOfTimeInterval(const std::pair<Time, Time>& times_
   // todo
 }
 
+/*这个函数在laser_slam_worker中的scanCallBack中被调用，提供存储的laser_scan_中指定时间点上的scan在world坐标系中的表示。*/
 void LaserTrack::getLocalCloudInWorldFrame(const Time& timestamp_ns,
                                            DataPoints* out_point_cloud) const {
   std::lock_guard<std::recursive_mutex> lock(full_laser_track_mutex_);
@@ -263,6 +277,7 @@ void LaserTrack::getLocalCloudInWorldFrame(const Time& timestamp_ns,
   CHECK(it->time_ns == timestamp_ns) << "The requested local scan could not be found:";
 
   // Get the rigid transformation from the trajectory to transform the scan in world frame.
+  /*利用trajectory_中的world坐标系下的位姿信息的到转换矩阵进行坐标转换，我应该看一看laser_scans_中的数据是不是我传进来的*/
   PointMatcher::TransformationParameters transformation_matrix =
       trajectory_.evaluate(timestamp_ns).getTransformationMatrix().cast<float>();
   correctTransformationMatrix(&transformation_matrix);
@@ -525,6 +540,7 @@ void LaserTrack::localScanToSubMap() {
   }
   //tbm:rigid_transformation的类型是PointMatcher::Transformation*,
   if (params_.save_icp_results) {
+    
     last_scan.scan.save("/tmp/last_scan.vtk");
     sub_map.save("/tmp/sub_map.vtk");
     correctTransformationMatrix(&transformation_matrix);
@@ -533,6 +549,17 @@ void LaserTrack::localScanToSubMap() {
     correctTransformationMatrix(&icp_solution);
     rigid_transformation_->compute(last_scan.scan,icp_solution).save(
         "/tmp/last_scan_alligned_by_solution.vtk");
+        
+    /*
+    last_scan.scan.save("/tmp/last_scan.pcd");
+    sub_map.save("/tmp/sub_map.pcd");
+    correctTransformationMatrix(&transformation_matrix);
+    rigid_transformation_->compute(last_scan.scan,transformation_matrix).save(
+        "/tmp/last_scan_alligned_by_initial_guess.pcd");
+    correctTransformationMatrix(&icp_solution);
+    rigid_transformation_->compute(last_scan.scan,icp_solution).save(
+        "/tmp/last_scan_alligned_by_solution.pcd");
+        */
   }
 
   icp_transformation.T_a_b = convertTransformationMatrixToSE3(icp_solution);

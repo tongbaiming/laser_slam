@@ -50,8 +50,8 @@ void LaserSlamWorker::init(
   // Setup subscriber.
   scan_sub_ = nh.subscribe(params_.assembled_cloud_sub_topic, kScanSubscriberMessageQueueSize,
                            &LaserSlamWorker::scanCallback, this);
-  ROS_INFO("I am in LaserSlamWorker::init(), nh.namespace: %s", nh.getNamespace().c_str());
-  ROS_INFO("I am in LaserSlamWorker::init(), params_.assembled_cloud_sub_topic: %s", (params_.assembled_cloud_sub_topic).c_str());
+  //ROS_INFO("I am in LaserSlamWorker::init(), nh.namespace: %s", nh.getNamespace().c_str());
+  //ROS_INFO("I am in LaserSlamWorker::init(), params_.assembled_cloud_sub_topic: %s", (params_.assembled_cloud_sub_topic).c_str());
 
   // Setup publishers.
   trajectory_pub_ = nh.advertise<nav_msgs::Path>(params_.trajectory_pub_topic,
@@ -92,24 +92,28 @@ void LaserSlamWorker::init(
   //    point_cloud_pub_ = nh_.advertise<sensor_msgs::PointCloud2>(params_.full_map_pub_topic,
   //                                                               kPublisherQueueSize);
   //  }
-  //  new_fixed_cloud_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("new_fixed_cloud",
-  //                                                               kPublisherQueueSize);
+    new_fixed_cloud_pub_ = nh.advertise<sensor_msgs::PointCloud2>("new_fixed_cloud",
+                                                                 kPublisherQueueSize);
+    last_point_cloud_pub_ = nh.advertise<sensor_msgs::PointCloud2>("last_point_cloud", kPublisherQueueSize);
+    cloud_msg_in_pub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud_msg_in", kPublisherQueueSize);
+    new_scan_pub_= nh.advertise<sensor_msgs::PointCloud2>("new_scan", kPublisherQueueSize);
 }
 
 void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in) {
   std::lock_guard<std::recursive_mutex> lock_scan_callback(scan_callback_mutex_);
   if (!lock_scan_callback_) {
+    Clock clock;
     if (tf_listener_.waitForTransform(params_.odom_frame, params_.sensor_frame,
                                       cloud_msg_in.header.stamp, ros::Duration(kTimeout_s))) {
       // Get the tf transform.
       tf::StampedTransform tf_transform;
       tf_listener_.lookupTransform(params_.odom_frame, params_.sensor_frame,
                                    cloud_msg_in.header.stamp, tf_transform);
-      ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker, tf transform ok\n");
-      ROS_INFO("tf_transform.frame_id_ = %s, tf_transform.child_frame_id_ = %s", (tf_transform.frame_id_).c_str(), (tf_transform.child_frame_id_).c_str());
+      //ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker, tf transform ok\n");
+      //ROS_INFO("tf_transform.frame_id_ = %s, tf_transform.child_frame_id_ = %s", (tf_transform.frame_id_).c_str(), (tf_transform.child_frame_id_).c_str());
       //std::cout << "tf_transform.getBasis = " << tf_transform.getBasis() << std::endl;
-      std::cout << "tf_transform.getOrigin = " << tf_transform.getOrigin() << std::endl;
-      std::cout << "tf_transform.getRotation = " << tf_transform.getRotation() << std::endl;
+      //std::cout << "tf_transform.getOrigin = " << tf_transform.getOrigin() << std::endl;
+      //std::cout << "tf_transform.getRotation = " << tf_transform.getRotation() << std::endl;
 
       bool process_scan = false;
       SE3 current_pose;
@@ -121,37 +125,42 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
       } else {
         current_pose = tfTransformToPose(tf_transform).T_w;
         float dist_m = distanceBetweenTwoSE3(current_pose, last_pose_);
-        ROS_INFO("I am in laser_slam_worker, dist_m = %f", dist_m);
+        //ROS_INFO("I am in laser_slam_worker, dist_m = %f", dist_m);
         if (dist_m > params_.minimum_distance_to_add_pose) {
           process_scan = true;
           last_pose_ = current_pose;
         }
       }
-      ROS_INFO_THROTTLE(1.5,  "I am in laser_slam_worker,  before process_scan\n");
+      //ROS_INFO_THROTTLE(1.5,  "I am in laser_slam_worker,  before process_scan\n");
       if (process_scan) {
-        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan\n");
+        Clock clock2;
+        //Clock clock3;
+        //ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan\n");
         // Convert input cloud to laser scan.
         LaserScan new_scan;
-        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 0.1\n");
-        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, cloud_msg_in.row_step: %d \n", cloud_msg_in.row_step);
+        //ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 0.1\n");
+        //ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, cloud_msg_in.row_step: %d \n", cloud_msg_in.row_step);
         //std::cout << cloud_msg_in.fields << std::endl;
-        new_scan.scan = PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloud_msg_in);
-
-        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 0.2\n");
+        cloud_msg_in_pub_.publish(cloud_msg_in);
+        new_scan.scan = PointMatcher_ros::rosMsgToPointMatcherCloud_tbm<float>(cloud_msg_in, cloud_msg_in.is_dense);
+        new_scan_pub_.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(new_scan.scan, params_.sensor_frame, cloud_msg_in.header.stamp));
+        //ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 0.2\n");
         new_scan.time_ns = rosTimeToCurveTime(cloud_msg_in.header.stamp.toNSec());
-        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 0.3\n");
-
+        //ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 0.3\n");
+        clock2.takeTime();
+        std::cout << "convert to datapoints take time " << clock2.getRealTime() << std::endl;
+        new_scan.scan.save("/home/tbm/temp/last_scan.vtk");
         // Process the new scan and get new values and factors.
         gtsam::NonlinearFactorGraph new_factors;
         gtsam::Values new_values;
         bool is_prior;
-        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1\n");
-        ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1, params_.use_odometry_information: %d\n", params_.use_odometry_information);
+        //ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1\n");
+        //ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1, params_.use_odometry_information: %d\n", params_.use_odometry_information);
         if (params_.use_odometry_information) {
-          ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1.1, params_.use_odometry_information\n");
+          //ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1.1, params_.use_odometry_information\n");
           laser_track_->processPoseAndLaserScan(tfTransformToPose(tf_transform), new_scan,
                                                 &new_factors, &new_values, &is_prior);
-          ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1.2, params_.use_odometry_information\n");
+          //ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 1.2, params_.use_odometry_information\n");
         } else {
           Pose new_pose;
 
@@ -173,13 +182,15 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
               }
             }
           }
-
           new_pose.time_ns = new_pose_time_ns;
           laser_track_->processPoseAndLaserScan(new_pose, new_scan,
                                                 &new_factors, &new_values, &is_prior);
 
           last_pose_sent_to_laser_track_ = new_pose;
         }
+        clock2.takeTime();
+        std::cout << "processPoseAndLaserScan take time " << clock2.getRealTime() << std::endl;
+
 
         // Process the new values and factors.
         gtsam::Values result;
@@ -191,6 +202,9 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
 
         // Update the trajectory.
         laser_track_->updateFromGTSAMValues(result);
+
+        clock2.takeTime();
+        std::cout << "gtsam take time " << clock2.getRealTime() << std::endl;
 
         // Adjust the correction between the world and odom frames.
         Pose current_pose = laser_track_->getCurrentPose();
@@ -214,8 +228,13 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
 
         // Get the last cloud in world frame.
         DataPoints new_fixed_cloud;
+        DataPoints last_point_cloud;
         laser_track_->getLocalCloudInWorldFrame(laser_track_->getMaxTime(), &new_fixed_cloud);
-
+        laser_track_->getLastPointCloud(&last_point_cloud);
+        /*
+        应该测试一下这个得到的最新局部scan在world坐标系中的形式
+        */
+        
         // Transform the cloud in sensor frame
         //TODO(Renaud) move to a transformPointCloud() fct.
         //      laser_slam::PointMatcher::TransformationParameters transformation_matrix =
@@ -231,11 +250,11 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
         //          rigid_transformation->compute(new_fixed_cloud,transformation_matrix);
         //
         //
-        //      new_fixed_cloud_pub_.publish(
-        //          PointMatcher_ros::pointMatcherCloudToRosMsg<float>(fixed_cloud_in_sensor_frame,
-        //                                                             params_.sensor_frame,
-        //                                                             cloud_msg_in.header.stamp));
-
+              new_fixed_cloud_pub_.publish(
+                  PointMatcher_ros::pointMatcherCloudToRosMsg<float>(new_fixed_cloud,
+                                                                     params_.world_frame,
+                                                                     cloud_msg_in.header.stamp));
+              last_point_cloud_pub_.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(last_point_cloud, params_.sensor_frame, cloud_msg_in.header.stamp));
         PointCloud new_fixed_cloud_pcl = lpmToPcl(new_fixed_cloud);
 
         if (params_.remove_ground_from_local_map) {
@@ -265,11 +284,15 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
           }
         }
         publishMap();
+      clock2.takeTime();
+      std::cout << "process scan take time " << clock2.getRealTime() << std::endl;
       }
     } else {
       ROS_WARN_STREAM("[SegMapper] Timeout while waiting between " + params_.odom_frame  +
                       " and " + params_.sensor_frame  + ".");
     }
+    clock.takeTime();
+    std::cout << "scanCallback take time" << clock.getRealTime() << std::endl;
   }
 }
 
