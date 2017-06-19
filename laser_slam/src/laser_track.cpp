@@ -79,7 +79,7 @@ void LaserTrack::processLaserScan(const LaserScan& in_scan) {
 
   // Apply the input filters.
   Clock clock;
-  input_filters_.apply(scan.scan);
+  //input_filters_.apply(scan.scan);
   clock.takeTime();
   LOG(INFO) << "Took " << clock.getRealTime() << " ms to filter the input scan.";
 
@@ -145,7 +145,7 @@ void LaserTrack::processPoseAndLaserScan(const Pose& pose, const LaserScan& in_s
 
   // Apply the input filters.
   Clock clock;
-  input_filters_.apply(scan.scan);
+  //input_filters_.apply(scan.scan);
   clock.takeTime();
   LOG(INFO) << "Took " << clock.getRealTime() << " ms to filter the input scan.";
 
