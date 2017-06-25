@@ -60,6 +60,8 @@ void LaserSlamWorker::init(
   if (params_.publish_local_map) {
     local_map_pub_ = nh.advertise<sensor_msgs::PointCloud2>(params_.local_map_pub_topic,
                                                             kPublisherQueueSize);
+    local_map_no_filter_pub_ = nh.advertise<sensor_msgs::PointCloud2>(params_.local_map_pub_topic+"_no_filter",
+                                                            kPublisherQueueSize);
   }
 
   // Setup services.
@@ -95,6 +97,7 @@ void LaserSlamWorker::init(
     new_fixed_cloud_pub_ = nh.advertise<sensor_msgs::PointCloud2>("new_fixed_cloud",
                                                                  kPublisherQueueSize);
     last_point_cloud_pub_ = nh.advertise<sensor_msgs::PointCloud2>("last_point_cloud", kPublisherQueueSize);
+    last_point_cloud_fixed_pub_ = nh.advertise<sensor_msgs::PointCloud2>("last_point_cloud_fixed", kPublisherQueueSize);
     cloud_msg_in_pub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud_msg_in", kPublisherQueueSize);
     new_scan_pub_= nh.advertise<sensor_msgs::PointCloud2>("new_scan", kPublisherQueueSize);
 }
@@ -149,7 +152,7 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
         //ROS_INFO_THROTTLE(1.5, "I am in laser_slam_worker,  inside process_scan, flag 0.3\n");
         clock2.takeTime();
         std::cout << "convert to datapoints take time " << clock2.getRealTime() << std::endl;
-        new_scan.scan.save("/home/tbm/temp/last_scan.vtk");
+        new_scan.scan.save("/home/tbm/temp/new_scan.vtk");
         // Process the new scan and get new values and factors.
         gtsam::NonlinearFactorGraph new_factors;
         gtsam::Values new_values;
@@ -229,8 +232,10 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
         // Get the last cloud in world frame.
         DataPoints new_fixed_cloud;
         DataPoints last_point_cloud;
+        DataPoints last_point_cloud_fixed;
         laser_track_->getLocalCloudInWorldFrame(laser_track_->getMaxTime(), &new_fixed_cloud);
         laser_track_->getLastPointCloud(&last_point_cloud);
+        laser_track_->getLocalCloudInWorldFrame((--((laser_track_->getLaserScans()).end()))->time_ns, &last_point_cloud_fixed);
         /*
         应该测试一下这个得到的最新局部scan在world坐标系中的形式
         */
@@ -254,7 +259,11 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
                   PointMatcher_ros::pointMatcherCloudToRosMsg<float>(new_fixed_cloud,
                                                                      params_.world_frame,
                                                                      cloud_msg_in.header.stamp));
+              new_fixed_cloud.save("/tmp/new_fixed_cloud.vtk");
+              last_point_cloud.save("/tmp/last_point_cloud.vtk");
+              last_point_cloud_fixed.save("/tmp/last_point_cloud_fixed.vtk");
               last_point_cloud_pub_.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(last_point_cloud, params_.sensor_frame, cloud_msg_in.header.stamp));
+              last_point_cloud_fixed_pub_.publish(PointMatcher_ros::pointMatcherCloudToRosMsg<float>(last_point_cloud_fixed, params_.world_frame, cloud_msg_in.header.stamp));
         PointCloud new_fixed_cloud_pcl = lpmToPcl(new_fixed_cloud);
 
         if (params_.remove_ground_from_local_map) {
@@ -279,6 +288,7 @@ void LaserSlamWorker::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in)
               local_map_ += new_fixed_cloud_pcl;
             } else {
               local_map_ = new_fixed_cloud_pcl;
+              pcl::io::savePCDFileASCII ("/tmp/local_map_first.pcd", local_map_);
             }
             local_map_queue_.push_back(new_fixed_cloud_pcl);
           }
@@ -376,13 +386,36 @@ void LaserSlamWorker::publishMap() {
     //      point_cloud_pub_.publish(msg);
     //    }
     if (params_.publish_local_map) {
+      //tbm change 将local_map_存到文件/tmp/local_map.vtk
+      //laser_slam::PointMatcher::DataPoints local_map_lpm = PclTolpm(local_map_, params_.world_frame);
+      //local_map_lpm.save("/tmp/local_map.vtk");
+    	pcl::io::savePCDFileASCII ("/tmp/local_map.pcd", local_map_);
       sensor_msgs::PointCloud2 msg;
+      sensor_msgs::PointCloud2 msg_2;
       {
         std::lock_guard<std::recursive_mutex> lock(local_map_filtered_mutex_);
         convert_to_point_cloud_2_msg(local_map_filtered_, params_.world_frame, &msg);
+        convert_to_point_cloud_2_msg(local_map_, params_.world_frame, &msg_2);
       }
       ROS_INFO( "@@@@@I am going to publish %s", (params_.local_map_pub_topic).c_str());
+      std::cout << "local_map_pub_topic header stamp : " << msg.header.stamp << std::endl;
+      std::cout << "local_map_pub_topic fields size  : " << msg.fields.size() << std::endl;
+      std::cout << "local_map_pub_topic height  : " << msg.height << std::endl;
+      std::cout << "local_map_pub_topic width  : " << msg.width << std::endl;
+      std::cout << "local_map_pub_topic fields : \n" << msg.fields.front() << std::endl;
+      std::cout << "local_map_pub_topic fields : \n" << *(msg.fields.begin() + 1)<< std::endl;
+      std::cout << "local_map_pub_topic fields : \n" << *(msg.fields.begin() + 2)<< std::endl;
+      std::cout << "local_map_pub_topic fields : \n" << *(msg.fields.begin() + 3)<< std::endl;
+      std::cout << "local_map_pub_topic is dense : \n" << (bool)msg.is_dense << std::endl;
+      std::cout << "local_map_pub_topic is point step : \n" << msg.point_step << std::endl;
+      std::cout << "local_map_pub_topic data 0-32 : " << std::endl;
+      for (int jj=0; jj < 65; jj++)
+      {
+    	 std::cout << (uint16_t)msg.data[jj] << " ";
+      }
+      std::cout << std::endl;
       local_map_pub_.publish(msg);
+      local_map_no_filter_pub_.publish(msg_2);
     }
     //    if (params_.publish_distant_map) {
     //      sensor_msgs::PointCloud2 msg;

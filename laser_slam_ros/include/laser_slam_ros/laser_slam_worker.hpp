@@ -121,11 +121,13 @@ class LaserSlamWorker {
   // Publishers.
   ros::Publisher trajectory_pub_;
   ros::Publisher local_map_pub_;
+  ros::Publisher local_map_no_filter_pub_;
   //  ros::Publisher odometry_trajectory_pub_;
   //  ros::Publisher point_cloud_pub_;
   //  ros::Publisher distant_map_pub_;
   ros::Publisher new_fixed_cloud_pub_;
   ros::Publisher last_point_cloud_pub_;
+  ros::Publisher last_point_cloud_fixed_pub_;
   ros::Publisher cloud_msg_in_pub_;
   ros::Publisher new_scan_pub_;
 

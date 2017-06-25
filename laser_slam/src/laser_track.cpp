@@ -1,5 +1,8 @@
 #include "laser_slam/laser_track.hpp"
 
+//tbm add 
+#include <iostream>
+
 #include <gtsam/nonlinear/Marginals.h>
 
 using namespace gtsam;
@@ -280,8 +283,8 @@ void LaserTrack::getLocalCloudInWorldFrame(const Time& timestamp_ns,
   /*利用trajectory_中的world坐标系下的位姿信息的到转换矩阵进行坐标转换，我应该看一看laser_scans_中的数据是不是我传进来的*/
   PointMatcher::TransformationParameters transformation_matrix =
       trajectory_.evaluate(timestamp_ns).getTransformationMatrix().cast<float>();
-  correctTransformationMatrix(&transformation_matrix);
-
+  //tbm changed: correctTransformationMatrix(&transformation_matrix);
+  std::cout << transformation_matrix << std::endl;
   // Transform the scan in world frame.
   *out_point_cloud = rigid_transformation_->compute(it->scan,transformation_matrix);
 }

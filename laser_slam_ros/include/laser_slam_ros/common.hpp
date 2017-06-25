@@ -8,6 +8,10 @@
 #include <pcl/point_types.h>
 #include <ros/ros.h>
 #include <iostream>
+#include <pointmatcher_ros/point_cloud.h>
+#include <pointmatcher_ros/transform.h>
+
+#include <iostream>
 
 namespace laser_slam_ros {
 
@@ -214,6 +218,8 @@ static void convert_to_pcl_point_cloud(const sensor_msgs::PointCloud2& cloud_mes
   pcl::fromPCLPointCloud2(pcl_point_cloud_2, *converted);
 }
 
+//tbm:这个函数没有显式的传入一个时间作为msg.header.stamp，
+//不知道其中的两个函数pcl::toPCLPointCloud2和pcl_conversions::fromPCL是否有处理
 static void convert_to_point_cloud_2_msg(const PointICloud& cloud,
                                          const std::string& frame,
                                          sensor_msgs::PointCloud2* converted) {
@@ -233,6 +239,18 @@ static void convert_to_point_cloud_2_msg(const PointCloud& cloud,
   PointICloud cloud_i;
   pcl::copyPointCloud(cloud, cloud_i);
   convert_to_point_cloud_2_msg(cloud_i, frame, converted);
+}
+
+static laser_slam::PointMatcher::DataPoints PclTolpm(const PointCloud& cloud_in, const std::string& frame)
+{
+  laser_slam::PointMatcher::DataPoints cloud_out;
+  sensor_msgs::PointCloud2 msg;
+  convert_to_point_cloud_2_msg(cloud_in, frame, &msg);
+  msg.is_dense = true;
+  //
+  ROS_INFO("I am in PclTolpm, flag 1");
+  cloud_out = PointMatcher_ros::rosMsgToPointMatcherCloud_tbm_2<float>(msg, true);
+  return cloud_out;
 }
 
 static void applyCylindricalFilter(const PclPoint& center, double radius_m,
