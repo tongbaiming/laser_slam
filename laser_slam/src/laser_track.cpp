@@ -142,7 +142,8 @@ void LaserTrack::processPoseAndLaserScan(const Pose& pose, const LaserScan& in_s
   if (newValues != NULL) {
     newValues->clear();
   }
-
+  //pose是由laser_slam_worker中的tf_transform得到的,而tf_transform的时间戳与cloud_msg_in的时间戳是一致的
+  //in_scan是由cloud_msg_in转化而来的，二者时间戳一致，因此本函数中的参数pose与局部变量scan的时间戳是一致的
   LaserScan scan = in_scan;
 
   // Apply the input filters.
@@ -162,6 +163,8 @@ void LaserTrack::processPoseAndLaserScan(const Pose& pose, const LaserScan& in_s
   // Compute the relative pose measurement, extend the trajectory and
   // compute the ICP transformations.
   if (trajectory_.isEmpty()) {
+    //由于pose和scan的时间戳是一致的，这里恰好可以得到pose_measurements_中刚刚存储的pose
+    //extendTrajectory函数向trajectory_成员变量中加入刚刚得到的pose
     scan.key = extendTrajectory(scan.time_ns, getPoseMeasurement(scan.time_ns));
 
     // Update the pose key and save the scan.
@@ -171,6 +174,8 @@ void LaserTrack::processPoseAndLaserScan(const Pose& pose, const LaserScan& in_s
     if (newFactors != NULL) {
       Pose prior_pose = pose;
       // Add a prior on the first key.
+      //问题在这里，如果yaml文件中将参数force_priors设置为true那么这里将采用如下固定的值，所以发布的local map对不准
+      //tbm要将yaml文件中的参数改成false
       if (params_.force_priors) {
         prior_pose.T_w = SE3(SE3::Rotation(1.0, 0.0, 0.0, 0.0),
                              SE3::Position(0.0,
