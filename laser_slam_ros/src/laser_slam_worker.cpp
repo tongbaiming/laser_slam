@@ -398,6 +398,7 @@ void LaserSlamWorker::publishMap() {
         convert_to_point_cloud_2_msg(local_map_, params_.world_frame, &msg_2);
       }
       ROS_INFO( "@@@@@I am going to publish %s", (params_.local_map_pub_topic).c_str());
+      /*
       std::cout << "local_map_pub_topic header stamp : " << msg.header.stamp << std::endl;
       std::cout << "local_map_pub_topic fields size  : " << msg.fields.size() << std::endl;
       std::cout << "local_map_pub_topic height  : " << msg.height << std::endl;
@@ -409,10 +410,13 @@ void LaserSlamWorker::publishMap() {
       std::cout << "local_map_pub_topic is dense : \n" << (bool)msg.is_dense << std::endl;
       std::cout << "local_map_pub_topic is point step : \n" << msg.point_step << std::endl;
       std::cout << "local_map_pub_topic data 0-32 : " << std::endl;
+      */
+      /*
       for (int jj=0; jj < 65; jj++)
       {
     	 std::cout << (uint16_t)msg.data[jj] << " ";
       }
+      */
       std::cout << std::endl;
       local_map_pub_.publish(msg);
       local_map_no_filter_pub_.publish(msg_2);
